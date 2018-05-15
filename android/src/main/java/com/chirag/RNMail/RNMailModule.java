@@ -95,9 +95,32 @@ public class RNMailModule extends ReactContextBaseJavaModule {
         if (clip.hasKey("path") && !clip.isNull("path")) {
           String path = clip.getString("path");
           File file = new File(path);
-          file.setReadable(true, false);
-          if (file.exists()) {
-            uris.add(Uri.fromFile(file));
+
+          String name, suffix = "";
+          if (clip.hasKey("name"))
+            name = clip.getString("name");
+          else
+            name = file.getName();
+
+          if (clip.hasKey("type"))
+            suffix = "." + clip.getString("type");
+
+          File temporaryFile = null;
+          try {
+            temporaryFile = File.createTempFile(name, suffix, reactContext.getExternalCacheDir());
+            copy (file, temporaryFile);
+          } catch (IOException e) {
+            e.printStackTrace();
+            Log.e("RNMail", "Error copying to temporary file");
+          }
+
+          temporaryFile.setReadable(true, false);
+          if (temporaryFile.exists()) {
+            if (temporaryFile.length() == 0)
+              Log.d ("RNMail", "Warning, attaching empty file!");
+            uris.add(Uri.fromFile(temporaryFile));
+          } else {
+            Log.e("RNMail", "Attachment file does not exist");
           }
         }
       }
@@ -128,6 +151,25 @@ public class RNMailModule extends ReactContextBaseJavaModule {
         callback.invoke("error");
       }
 
+    }
+  }
+  
+  protected static void copy(File src, File dst) throws IOException {
+    InputStream in = new FileInputStream(src);
+    try {
+      OutputStream out = new FileOutputStream(dst);
+      try {
+        // Transfer bytes from in to out
+        byte[] buf = new byte[1024];
+        int len;
+        while ((len = in.read(buf)) > 0) {
+          out.write(buf, 0, len);
+        }
+      } finally {
+        out.close();
+      }
+    } finally {
+      in.close();
     }
   }
 }
